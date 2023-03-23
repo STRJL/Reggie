@@ -10,6 +10,17 @@ spring:
       driver-class-name: com.mysql.cj.jdbc.Driver
       username: root
       password: JMLUFO20010404
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: 123456
+    database: 0
+    lettuce:
+      pool:
+        max-active: 1000
+        max-idle: 8
+        min-idle: 2
+        max-wait: 1ms
 
 mybatis-plus:
   configuration:

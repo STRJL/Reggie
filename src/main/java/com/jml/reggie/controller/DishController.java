@@ -12,9 +12,11 @@ import com.jml.reggie.service.CategoryService;
 import com.jml.reggie.service.DishFlavorService;
 import com.jml.reggie.service.DishService;
 import lombok.extern.slf4j.Slf4j;
+import net.sf.jsqlparser.statement.select.KSQLWindow;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,15 +42,28 @@ public class DishController {
     @Autowired
     private CategoryService categoryService;
 
+    @Autowired
+    private RedisTemplate redisTemplate;
+
     @PostMapping
     public Result<String> save(@RequestBody DishDto dish){
         dishService.saveWithFileavor(dish);
+
+        String key="dish_"+dish.getCategoryId()+"_1";
+
+        redisTemplate.delete(key);
+
         return Result.success("添加成功");
     }
 
     @PutMapping
     public Result<String> update(@RequestBody DishDto dish){
         dishService.UpdateWithFileavor(dish);
+
+        String key="dish_"+dish.getCategoryId()+"_1";
+
+        redisTemplate.delete(key);
+
         return Result.success("修改成功");
     }
 
@@ -83,13 +99,26 @@ public class DishController {
     @GetMapping("/list")
     public Result<List<DishDto>> list(Dish dish){
 
+        //创建传入集合
+        List<DishDto> dtoList=null;
+
+        //定义rediskey
+        String key="dish_"+dish.getCategoryId()+"_1";
+        //查询redis中缓存的数据
+        dtoList=(List<DishDto>)redisTemplate.opsForValue().get(key);
+
+        if(dtoList!=null){
+            return Result.success(dtoList);
+        }
+
+
         LambdaQueryWrapper<Dish> w=new LambdaQueryWrapper<>();
         w.eq(dish.getCategoryId()!=null,Dish::getCategoryId,dish.getCategoryId());
         w.like(StringUtils.isNotEmpty(dish.getName()),Dish::getName,dish.getName());
         w.eq(Dish::getStatus,1);
         w.orderByAsc(Dish::getSort).orderByDesc(Dish::getUpdateTime);
         List<Dish> list = dishService.list(w);
-        List<DishDto> dtoList=list.stream().map((item)->{
+        dtoList=list.stream().map((item)->{
             DishDto dishDto=new DishDto();
 
             BeanUtils.copyProperties(item,dishDto);
@@ -112,6 +141,8 @@ public class DishController {
 
         }).collect(Collectors.toList());
 
+        //将数据库中的数据加入到缓存中区
+        redisTemplate.opsForValue().set(key,dtoList,30, TimeUnit.MINUTES);
 
         return Result.success(dtoList);
 
