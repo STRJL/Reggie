@@ -16,6 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -38,6 +41,9 @@ public class SetmealController {
 
     @Autowired
     private CategoryService categoryService;
+
+    @Autowired
+    private CacheManager cacheManager;
 
     @GetMapping("/page")
     public Result<Page> page(int page,int pageSize,String name){
@@ -75,6 +81,7 @@ public class SetmealController {
     }
 
     @PostMapping("/status/{status}")
+    @CacheEvict(value = "SetmealCache",allEntries = true)
     public Result<String> update(@PathVariable Integer status, String ids){
 
         log.info(status.toString());
@@ -89,6 +96,7 @@ public class SetmealController {
     }
 
     @DeleteMapping
+    @CacheEvict(value = "SetmealCache",allEntries = true)
     public Result<String> delete(@RequestParam List<Long> ids){
 //        List<Long> split = new ArrayList<>(Arrays.asList(ids.split(","))).stream().map(Long::parseLong).collect(Collectors.toList());
 
@@ -97,12 +105,14 @@ public class SetmealController {
     }
 
     @PostMapping
+    @CacheEvict(value = "SetmealCache",allEntries = true)
     public Result<String> save(@RequestBody SetmealDto dto){
         setmealService.saveSetmeal(dto);
         return Result.success("添加成功");
     }
 
     @GetMapping("/list")
+    @Cacheable(value = "SetmealCache",key = "'setmeal_'+#setmeal.categoryId+'_1'")
     public Result<List<SetmealDto>> GetSetm(Setmeal setmeal){
         LambdaQueryWrapper<Setmeal> s=new LambdaQueryWrapper<>();
         s.eq(setmeal.getCategoryId()!=null,Setmeal::getCategoryId,setmeal.getCategoryId()).eq(Setmeal::getStatus,1);
@@ -175,6 +185,7 @@ public class SetmealController {
     }
 
     @PutMapping
+    @CacheEvict(value = "SetmealCache",allEntries = true)
     public Result<String> update(@RequestBody SetmealDto dto){
         setmealService.updateSetmeal(dto);
         return Result.success("修改成功");
